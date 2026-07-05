@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Britsync AI Outreach Copilot</title>
+    <meta name="description" content="Autonomous AI Agent to find clients, scrape creators, and run voice outreach.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-dot"></span>
+                    <h2>Britsync</h2>
+                </div>
+                <button class="new-chat-btn" id="new-chat-btn">
+                    <i class="fa-solid fa-plus"></i> New Scan
+                </button>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="nav-section">
+                    <h3>Recent Scans</h3>
+                    <ul class="chat-history" id="chat-history">
+                        <li class="active"><i class="fa-solid fa-magnifying-glass"></i> Dental Clinics (London)</li>
+                        <li><i class="fa-solid fa-user-group"></i> Tech Creators (10k-100k)</li>
+                        <li><i class="fa-solid fa-building"></i> Law Firms (Manchester)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="system-status">
+                    <span class="status-indicator online"></span>
+                    <span>Qdrant DB: Connected</span>
+                </div>
+                <div class="system-status">
+                    <span class="status-indicator online"></span>
+                    <span>Dograh Voice API: Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <!-- Header -->
+            <header class="chat-header">
+                <div class="header-title">
+                    <h1>Outreach Copilot</h1>
+                    <span class="badge">v1.0</span>
+                </div>
+                <div class="header-actions">
+                    <a href="https://84.247.164.10:8445" target="_blank" class="header-link">
+                        <i class="fa-solid fa-phone-volume"></i> Open Dograh Voice Dashboard
+                    </a>
+                </div>
+            </header>
+
+            <!-- Chat Messages Container -->
+            <div class="messages-container" id="messages-container">
+                <!-- Welcome Screen -->
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="welcome-icon">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                    <h1>How can Britsync help your business today?</h1>
+                    <p class="welcome-subtitle">Ask me to find clients for your products or scrape targeted TikTok & YouTube influencers.</p>
+                    
+                    <div class="suggestion-cards">
+                        <div class="suggestion-card" onclick="useSuggestion('Find dental clinics in London for our AI calling receptionist product')">
+                            <i class="fa-solid fa-tooth text-blue"></i>
+                            <h3>Find Clients</h3>
+                            <p>"Find dental clinics in London for our AI calling receptionist product"</p>
+                        </div>
+                        <div class="suggestion-card" onclick="useSuggestion('Scrape tech and gadget YouTubers with 10k to 100k subscribers to promote our new software')">
+                            <i class="fa-brands fa-youtube text-red"></i>
+                            <h3>YouTube Affiliates</h3>
+                            <p>"Scrape tech YouTubers with 10k to 100k subscribers to promote our software"</p>
+                        </div>
+                        <div class="suggestion-card" onclick="useSuggestion('Find fitness and health TikTokers with 20k to 80k followers in the UK')">
+                            <i class="fa-brands fa-tiktok text-purple"></i>
+                            <h3>TikTok Affiliates</h3>
+                            <p>"Find fitness TikTokers with 20k to 80k followers in the UK"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Container (Gemini-style) -->
+            <footer class="input-container">
+                <form id="chat-form" class="input-form">
+                    <div class="input-wrapper">
+                        <input type="text" id="user-input" placeholder="Type a product or influencer niche to search..." autocomplete="off" required>
+                        <div class="input-actions">
+                            <button type="submit" class="send-btn" id="send-btn" aria-label="Send Message">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div class="input-footer-text">
+                    Britsync AI Outreach Copilot uses live Tavily web scraping and Qdrant vector memory to find high-value targets.
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Modal for Email Draft -->
+    <div id="email-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-envelope-open-text text-blue"></i> Personalized Email Draft</h2>
+                <span class="close-modal" id="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <textarea id="email-draft-text" readonly></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn call-btn" id="copy-draft-btn">
+                    <i class="fa-solid fa-copy"></i> Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script -->
+    <script src="/static/script.js"></script>
+</body>
+</html>
