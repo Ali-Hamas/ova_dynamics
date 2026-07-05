@@ -51,8 +51,13 @@ except Exception:
     qdrant_client = QdrantClient(path="./qdrant_db")
 
 # Models for Request Bodies
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class ChatRequest(BaseModel):
     message: str
+    history: list[ChatMessage] = []
 
 class CallRequest(BaseModel):
     phone_number: str
@@ -170,9 +175,19 @@ def get_company_news(company: str = Query(..., description="Name of the company"
 async def chat_handler(req: ChatRequest):
     message = req.message.strip()
     
+    # Format conversation history context for the LLM
+    history_context = ""
+    for msg in req.history:
+        history_context += f"{msg.role.upper()}: {msg.content}\n"
+    
     # Use LLM to analyze intent, identify target audience, and generate the best search queries
     intent_prompt = f"""
-    You are an agentic lead generation coordinator. Analyze this user request: "{message}"
+    You are an agentic lead generation coordinator.
+    
+    Here is the conversation history:
+    {history_context}
+    
+    Analyze this current user request: "{message}"
     
     Identify if they want to find:
     1. "client_search" (B2B companies, schools, colleges, clinics, local services, etc.)

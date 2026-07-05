@@ -1,4 +1,4 @@
-// Britsync AI Outreach Copilot - Frontend Logic
+// Britsync AI Outreach Copilot - Frontend Logic with LocalStorage Chat History
 
 document.addEventListener("DOMContentLoaded", () => {
     const chatForm = document.getElementById("chat-form");
@@ -6,6 +6,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const messagesContainer = document.getElementById("messages-container");
     const welcomeScreen = document.getElementById("welcome-screen");
     const newChatBtn = document.getElementById("new-chat-btn");
+    const chatHistoryList = document.getElementById("chat-history");
+
+    let sessions = JSON.parse(localStorage.getItem("britsync_sessions") || "[]");
+    let currentSessionId = null;
+
+    // Load sessions and show sidebar
+    renderSessionsSidebar();
 
     // Pre-fill input when clicking suggestions
     window.useSuggestion = (text) => {
@@ -15,10 +22,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // New Scan / Reset chat
     newChatBtn.addEventListener("click", () => {
-        messagesContainer.innerHTML = "";
-        messagesContainer.appendChild(welcomeScreen);
+        currentSessionId = null;
+        clearChatArea();
         welcomeScreen.style.display = "block";
         userInput.value = "";
+        renderSessionsSidebar();
     });
 
     // Handle Form Submit
@@ -27,25 +35,51 @@ document.addEventListener("DOMContentLoaded", () => {
         const query = userInput.value.trim();
         if (!query) return;
 
-        // Hide welcome screen on first message
-        if (welcomeScreen) {
-            welcomeScreen.style.display = "none";
+        // Hide welcome screen
+        welcomeScreen.style.display = "none";
+
+        // If no active session, create a new one
+        if (!currentSessionId) {
+            currentSessionId = "session_" + Date.now();
+            const sessionTitle = query.length > 28 ? query.substring(0, 25) + "..." : query;
+            sessions.unshift({
+                id: currentSessionId,
+                title: sessionTitle,
+                messages: []
+            });
+            saveSessionsToStorage();
         }
+
+        // Retrieve current session
+        const session = sessions.find(s => s.id === currentSessionId);
 
         // 1. Add User Message
         appendMessage(query, "user");
+        session.messages.push({ sender: "user", text: query });
+        saveSessionsToStorage();
+        renderSessionsSidebar();
+        
         userInput.value = "";
+
+        // Compile history context for the LLM backend
+        const historyPayload = session.messages.slice(0, -1).map(m => ({
+            role: m.sender === "user" ? "user" : "assistant",
+            content: m.text
+        }));
 
         // 2. Add AI Response Placeholder with loading/thinking status
         const aiMessageDiv = appendMessage("", "ai", true);
         const contentDiv = aiMessageDiv.querySelector(".message-content");
 
         try {
-            // Send API request
+            // Send API request with message and history payload
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: query })
+                body: JSON.stringify({ 
+                    message: query,
+                    history: historyPayload
+                })
             });
 
             if (!response.ok) {
@@ -63,7 +97,9 @@ document.addEventListener("DOMContentLoaded", () => {
             contentDiv.appendChild(responseText);
 
             // Render Leads Grid if leads are present
+            let leadsData = null;
             if (data.leads && data.leads.length > 0) {
+                leadsData = data.leads;
                 const gridDiv = document.createElement("div");
                 gridDiv.className = "leads-grid";
 
@@ -75,6 +111,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 contentDiv.appendChild(gridDiv);
             }
 
+            // Save AI response to session memory
+            session.messages.push({ 
+                sender: "ai", 
+                text: data.response || "", 
+                leads: leadsData 
+            });
+            saveSessionsToStorage();
+
         } catch (error) {
             contentDiv.innerHTML = `<p style="color: var(--accent-red);"><i class="fa-solid fa-triangle-exclamation"></i> Error: Failed to fetch leads. Make sure the backend server is running.</p>`;
             console.error(error);
@@ -85,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Helper: Create Chat Message bubble
-    function appendMessage(text, sender, isLoading = false) {
+    function appendMessage(text, sender, isLoading = false, leads = null) {
         const messageDiv = document.createElement("div");
         messageDiv.className = `message message-${sender}`;
 
@@ -109,6 +153,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const p = document.createElement("p");
             p.textContent = text;
             contentDiv.appendChild(p);
+
+            // If history load contains leads, render the grid
+            if (leads && leads.length > 0) {
+                const gridDiv = document.createElement("div");
+                gridDiv.className = "leads-grid";
+                leads.forEach(lead => {
+                    gridDiv.appendChild(createLeadCard(lead));
+                });
+                contentDiv.appendChild(gridDiv);
+            }
         }
 
         messageDiv.appendChild(headerDiv);
@@ -176,6 +230,50 @@ document.addEventListener("DOMContentLoaded", () => {
         return card;
     }
 
+    // Load sessions and render sidebar list
+    function renderSessionsSidebar() {
+        chatHistoryList.innerHTML = "";
+        
+        if (sessions.length === 0) {
+            chatHistoryList.innerHTML = `<li class="no-scans-text" style="font-size: 12px; color: var(--text-secondary); text-align: center; padding: 10px;">No recent scans.</li>`;
+            return;
+        }
+
+        sessions.forEach(session => {
+            const li = document.createElement("li");
+            li.className = session.id === currentSessionId ? "active" : "";
+            li.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${session.title}`;
+            li.addEventListener("click", () => loadSession(session.id));
+            chatHistoryList.appendChild(li);
+        });
+    }
+
+    // Load messages from a session into the chat area
+    function loadSession(sessionId) {
+        currentSessionId = sessionId;
+        clearChatArea();
+        welcomeScreen.style.display = "none";
+        
+        const session = sessions.find(s => s.id === sessionId);
+        if (session && session.messages) {
+            session.messages.forEach(msg => {
+                appendMessage(msg.text, msg.sender, false, msg.leads);
+            });
+        }
+        
+        renderSessionsSidebar();
+    }
+
+    // Clear chat helper
+    function clearChatArea() {
+        const messages = messagesContainer.querySelectorAll(".message");
+        messages.forEach(m => m.remove());
+    }
+
+    function saveSessionsToStorage() {
+        localStorage.setItem("britsync_sessions", JSON.stringify(sessions));
+    }
+
     // Modal elements
     const emailModal = document.getElementById("email-modal");
     const closeModal = document.getElementById("close-modal");
@@ -208,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Global Action: Generate Message Draft
     window.generateMessage = async (name, company) => {
-        emailDraftText.value = "Drafting personalized email for you...";
+        emailDraftText.value = "Drafting personalized message for you...";
         emailModal.classList.add("show");
 
         try {
