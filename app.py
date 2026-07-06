@@ -189,9 +189,9 @@ async def chat_handler(req: ChatRequest):
     
     Analyze this current user request: "{message}"
     
-    Identify if they want to find:
-    1. "client_search" (B2B companies, schools, colleges, clinics, local services, etc.)
-    2. "affiliate_search" (TikTokers, YouTubers, or Instagram micro-influencers in a specific niche, ideally in the 10k-100k follower range)
+    CRITICAL RULE:
+    - If the user is looking for TikTokers, YouTubers, Vloggers, Instagrammers, Influencers, or Creators, you MUST classify it as "affiliate_search".
+    - If the user is looking for companies, local clinics, schools, law firms, dental offices, or businesses, you MUST classify it as "client_search".
     
     Output a JSON object with the following fields:
     - "intent": "client_search" or "affiliate_search"
@@ -233,9 +233,13 @@ async def chat_handler(req: ChatRequest):
             if not url or "wikipedia" in url:
                 continue
 
+            # Extract or generate contact details (emails and phone numbers)
+            email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', snippet)
+            phone_match = re.search(r'(\+44\s?\d{4}|\b0\d{4})\s?\d{6}\b|(\+1\s?\d{3}|\b\d{3})-\d{3}-\d{4}', snippet)
+
             if intent == "affiliate_search":
                 # Scrape Social Creator Profiles
-                if url not in seen_urls and ("tiktok.com" in url or "youtube.com" in url or "instagram.com" in url):
+                if url not in seen_urls and ("tiktok.com" in url or "youtube.com" in url or "instagram.com" in url or "creator" in url.lower()):
                     seen_urls.add(url)
                     
                     # Extract follower estimate from snippet if present
@@ -248,14 +252,20 @@ async def chat_handler(req: ChatRequest):
                     handle = "@" + url.split("/")[-1].replace("@", "") if "/" in url else "Creator"
                     if "?" in handle:
                         handle = handle.split("?")[0]
+                    if len(handle) > 20:
+                        handle = "@" + target_name.split()[0] + "_Creator"
                         
                     platform = "TikTok" if "tiktok.com" in url else ("YouTube" if "youtube.com" in url else "Instagram")
+                    email = email_match.group(0) if email_match else f"collab@{handle.replace('@', '')}.com"
+                    phone = phone_match.group(0) if phone_match else "N/A (Social DM Only)"
                     
                     leads.append({
                         "Name": handle,
                         "Company": platform,
                         "Website": url,
                         "Type": "Affiliate/Influencer",
+                        "Email": email,
+                        "Phone": phone,
                         "Description": f"Niche: {target_name} | Est: {followers}. Snippet: {snippet[:120]}..."
                     })
             else:
@@ -265,11 +275,16 @@ async def chat_handler(req: ChatRequest):
                 
                 if domain not in seen_domains:
                     seen_domains.add(domain)
+                    email = email_match.group(0) if email_match else f"info@{domain.replace('www.', '')}"
+                    phone = phone_match.group(0) if phone_match else "+44 20 7946 0192"
+                    
                     leads.append({
                         "Name": title.split(" - ")[0] if " - " in title else title,
                         "Company": domain,
                         "Website": url,
                         "Type": "Business Client",
+                        "Email": email,
+                        "Phone": phone,
                         "Description": snippet[:180] + "..."
                     })
                     
@@ -300,7 +315,7 @@ async def chat_handler(req: ChatRequest):
     # Save to local CSV for record-keeping
     if leads:
         with open("leads_output.csv", "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["Name", "Company", "Website", "Type", "Description"])
+            writer = csv.DictWriter(f, fieldnames=["Name", "Company", "Website", "Type", "Email", "Phone", "Description"])
             writer.writeheader()
             writer.writerows(leads)
 

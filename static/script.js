@@ -194,8 +194,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         </a>
                     </div>
                     <p class="lead-desc">${description}</p>
+                    <div class="lead-contact-info" style="margin-top:10px; font-size:11px; display:flex; flex-direction:column; gap:4px; opacity:0.85;">
+                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-envelope" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Email || "N/A"}</span>
+                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-phone" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Phone || "N/A"}</span>
+                    </div>
                 </div>
-                <div class="lead-actions">
+                <div class="lead-actions" style="margin-top: 15px;">
                     <a href="${website}" target="_blank" class="action-btn call-btn" style="text-decoration:none;">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Profile
                     </a>
@@ -215,8 +219,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         </a>
                     </div>
                     <p class="lead-desc">${description}</p>
+                    <div class="lead-contact-info" style="margin-top:10px; font-size:11px; display:flex; flex-direction:column; gap:4px; opacity:0.85;">
+                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-envelope" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Email || "N/A"}</span>
+                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-phone" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Phone || "N/A"}</span>
+                    </div>
                 </div>
-                <div class="lead-actions">
+                <div class="lead-actions" style="margin-top: 15px;">
                     <button class="action-btn call-btn" onclick="triggerCall('${title}', '${company}')">
                         <i class="fa-solid fa-phone"></i> Call Lead
                     </button>
