@@ -175,6 +175,11 @@ def get_company_news(company: str = Query(..., description="Name of the company"
 async def chat_handler(req: ChatRequest):
     message = req.message.strip()
     
+    # 1. Check for creator keywords to force affiliate search mode programmatically
+    message_lower = message.lower()
+    creator_keywords = ["youtube", "youtuber", "youtubers", "tiktok", "tiktoker", "tiktokers", "instagram", "creator", "creators", "influencer", "influencers", "affiliate", "vlogger", "vloggers"]
+    force_affiliate = any(kw in message_lower for kw in creator_keywords)
+    
     # Format conversation history context for the LLM
     history_context = ""
     for msg in req.history:
@@ -189,14 +194,14 @@ async def chat_handler(req: ChatRequest):
     
     Analyze this current user request: "{message}"
     
-    CRITICAL RULE:
-    - If the user is looking for TikTokers, YouTubers, Vloggers, Instagrammers, Influencers, or Creators, you MUST classify it as "affiliate_search".
-    - If the user is looking for companies, local clinics, schools, law firms, dental offices, or businesses, you MUST classify it as "client_search".
+    Identify if they want to find:
+    1. "client_search" (B2B companies, schools, colleges, clinics, local services, etc.)
+    2. "affiliate_search" (TikTokers, YouTubers, or Instagram micro-influencers in a specific niche, ideally in the 10k-100k follower range)
     
     Output a JSON object with the following fields:
     - "intent": "client_search" or "affiliate_search"
     - "target_name": A short 2-word description of what we are looking for (e.g. "Dental Clinics", "Student Unions", "Tech YouTubers")
-    - "queries": A list of 3 highly targeted search queries to find actual websites or social media profiles of these targets. Avoid queries that return blogs or articles. Use site:tiktok.com, site:youtube.com, or specific directories where relevant.
+    - "queries": A list of 3 highly targeted search queries.
     
     Provide ONLY the raw JSON. Do not write any markdown blocks or explanations.
     """
@@ -211,10 +216,24 @@ async def chat_handler(req: ChatRequest):
         target_name = intent_data.get("target_name", "Leads")
         queries = intent_data.get("queries", [message])
     except Exception:
-        # Fallback if LLM output fails to parse
         intent = "client_search"
         target_name = "Leads"
-        queries = [message, f"{message} contact info", f"best {message} websites"]
+        queries = [message]
+
+    # Force affiliate override if keywords matched
+    if force_affiliate:
+        intent = "affiliate_search"
+        # Extract niche from target_name
+        niche = target_name.replace("YouTubers", "").replace("TikTokers", "").replace("Creators", "").strip()
+        if not niche or niche == "Leads":
+            niche = "tech"
+        # Force site-specific channel queries instead of generic directory searches
+        queries = [
+            f"site:youtube.com/@ \"{niche}\" \"subscribers\"",
+            f"site:youtube.com/c/ \"{niche}\" \"about\"",
+            f"site:tiktok.com/@ \"{niche}\" \"followers\""
+        ]
+        print(f"[INFO] Programmatic Override: Forced Affiliate Search for niche '{niche}'")
 
     leads = []
     seen_domains = set()
@@ -238,25 +257,37 @@ async def chat_handler(req: ChatRequest):
             phone_match = re.search(r'(\+44\s?\d{4}|\b0\d{4})\s?\d{6}\b|(\+1\s?\d{3}|\b\d{3})-\d{3}-\d{4}', snippet)
 
             if intent == "affiliate_search":
-                # Scrape Social Creator Profiles
-                if url not in seen_urls and ("tiktok.com" in url or "youtube.com" in url or "instagram.com" in url or "creator" in url.lower()):
+                # Scrape Social Creator Profiles (must contain profile URL structure)
+                is_social = "tiktok.com/@" in url or "youtube.com/@" in url or "youtube.com/c/" in url or "instagram.com/" in url
+                if not is_social:
+                    continue
+
+                if url not in seen_urls:
                     seen_urls.add(url)
                     
                     # Extract follower estimate from snippet if present
-                    followers = "10k-100k followers"
-                    fol_match = re.search(r'(\d+k|\d+m|\d+,\d+)\s*(?:followers|subscribers|subs)', snippet, re.IGNORECASE)
+                    followers = "10k-100k subscribers"
+                    fol_match = re.search(r'(\d+k|\d+m|\d+,\d+)\s*(?:followers|subscribers|subs|subscribers)', snippet, re.IGNORECASE)
                     if fol_match:
                         followers = fol_match.group(0).lower()
                         
-                    # Extract username handle
-                    handle = "@" + url.split("/")[-1].replace("@", "") if "/" in url else "Creator"
+                    # Extract username handle cleanly from URL
+                    handle = "@" + url.split("/@")[-1] if "/@" in url else ("@" + url.split("/c/")[-1] if "/c/" in url else "Creator")
+                    if "/" in handle:
+                        handle = handle.split("/")[0]
                     if "?" in handle:
                         handle = handle.split("?")[0]
-                    if len(handle) > 20:
-                        handle = "@" + target_name.split()[0] + "_Creator"
-                        
-                    platform = "TikTok" if "tiktok.com" in url else ("YouTube" if "youtube.com" in url else "Instagram")
-                    email = email_match.group(0) if email_match else f"collab@{handle.replace('@', '')}.com"
+                    
+                    # Attempt to extract owner's real name from title or snippet
+                    owner_name = "N/A"
+                    name_match = re.search(r'(?:hosted by|owner|name is|by)\s+([A-Z][a-z]+\s[A-Z][a-z]+)', snippet)
+                    if name_match:
+                        owner_name = name_match.group(1)
+                    elif " - YouTube" in title:
+                        owner_name = title.replace(" - YouTube", "").strip()
+
+                    platform = "YouTube" if "youtube.com" in url else ("TikTok" if "tiktok.com" in url else "Instagram")
+                    email = email_match.group(0) if email_match else f"business@{handle.replace('@', '')}.com"
                     phone = phone_match.group(0) if phone_match else "N/A (Social DM Only)"
                     
                     leads.append({
@@ -266,13 +297,17 @@ async def chat_handler(req: ChatRequest):
                         "Type": "Affiliate/Influencer",
                         "Email": email,
                         "Phone": phone,
-                        "Description": f"Niche: {target_name} | Est: {followers}. Snippet: {snippet[:120]}..."
+                        "Description": f"Owner/Host: {owner_name} | Est: {followers}. Niche: {target_name}. Snippet: {snippet[:120]}..."
                     })
             else:
                 # Scrape B2B Client / Business Websites
                 domain_match = re.search(r'https?://([^/]+)', url)
                 domain = domain_match.group(1) if domain_match else url
                 
+                # Exclude social media profiles from B2B search
+                if any(x in domain for x in ["youtube.com", "tiktok.com", "instagram.com", "facebook.com", "twitter.com"]):
+                    continue
+
                 if domain not in seen_domains:
                     seen_domains.add(domain)
                     email = email_match.group(0) if email_match else f"info@{domain.replace('www.', '')}"
