@@ -1,4 +1,4 @@
-// Britsync AI Outreach Copilot - Frontend Logic with LocalStorage Chat History, Advanced Campaigns & Mobile Responsiveness
+// Britsync AI Outreach Copilot - Frontend Logic with LocalStorage Chat History, Advanced Campaigns & Sent History
 
 document.addEventListener("DOMContentLoaded", () => {
     const chatForm = document.getElementById("chat-form");
@@ -7,12 +7,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const welcomeScreen = document.getElementById("welcome-screen");
     const newChatBtn = document.getElementById("new-chat-btn");
     const chatHistoryList = document.getElementById("chat-history");
+    const sentHistoryList = document.getElementById("sent-history-list");
 
     let sessions = JSON.parse(localStorage.getItem("britsync_sessions") || "[]");
+    let sentMessages = JSON.parse(localStorage.getItem("britsync_sent") || "[]");
     let currentSessionId = null;
 
-    // Load sessions and show sidebar
+    // Load sessions and sent messages on startup
     renderSessionsSidebar();
+    renderSentHistorySidebar();
 
     // Mobile Sidebar Toggle Drawer
     const menuToggleBtn = document.getElementById("menu-toggle-btn");
@@ -379,6 +382,41 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Load sent outbox messages and render in the sidebar Sent messages list
+    function renderSentHistorySidebar() {
+        sentHistoryList.innerHTML = "";
+        
+        if (sentMessages.length === 0) {
+            sentHistoryList.innerHTML = `<li class="no-scans-text" style="font-size: 12px; color: var(--text-secondary); text-align: center; padding: 10px;">No sent messages.</li>`;
+            return;
+        }
+
+        sentMessages.forEach(msg => {
+            const li = document.createElement("li");
+            li.style = "display: flex; justify-content: space-between; align-items: center;";
+            
+            const linkSpan = document.createElement("span");
+            linkSpan.className = "history-item-link";
+            linkSpan.innerHTML = `<i class="fa-solid fa-paper-plane" style="color: var(--accent-purple); font-size: 11px;"></i> to: ${msg.email}`;
+            linkSpan.style.cursor = "pointer";
+            linkSpan.addEventListener("click", () => {
+                viewSentMessage(msg.id);
+                if (window.innerWidth <= 768 && sidebar) {
+                    sidebar.classList.remove("open");
+                }
+            });
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "delete-sent-btn";
+            deleteBtn.innerHTML = `<i class="fa-solid fa-trash-can"></i>`;
+            deleteBtn.addEventListener("click", (e) => deleteSentMessage(e, msg.id));
+
+            li.appendChild(linkSpan);
+            li.appendChild(deleteBtn);
+            sentHistoryList.appendChild(li);
+        });
+    }
+
     // Delete Session handler (deletes local scan history)
     window.deleteSession = (event, sessionId) => {
         event.stopPropagation();
@@ -399,6 +437,19 @@ document.addEventListener("DOMContentLoaded", () => {
         renderSessionsSidebar();
     };
 
+    // Delete Sent Message handler
+    window.deleteSentMessage = (event, msgId) => {
+        event.stopPropagation();
+        
+        if (!confirm("Are you sure you want to delete this outbox archive?")) {
+            return;
+        }
+
+        sentMessages = sentMessages.filter(m => m.id !== msgId);
+        localStorage.setItem("britsync_sent", JSON.stringify(sentMessages));
+        renderSentHistorySidebar();
+    };
+
     // Load messages from a session into the chat area
     function loadSession(sessionId) {
         currentSessionId = sessionId;
@@ -413,6 +464,26 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         renderSessionsSidebar();
+    }
+
+    // View Sent Message archive details
+    function viewSentMessage(msgId) {
+        const msg = sentMessages.find(m => m.id === msgId);
+        if (!msg) return;
+
+        // Configure Modal for Read-Only archive view
+        document.querySelector("#email-modal h2").innerHTML = `<i class="fa-solid fa-paper-plane text-purple"></i> Sent Message Archive`;
+        document.getElementById("modal-to-email").value = msg.email;
+        document.getElementById("modal-subject").value = msg.subject;
+        emailDraftText.value = msg.body;
+        
+        // Lock inputs so they can't edit sent logs
+        document.getElementById("modal-subject").setAttribute("readonly", true);
+        emailDraftText.setAttribute("readonly", true);
+        
+        // Hide Send button
+        sendOutboxBtn.style.display = "none";
+        emailModal.classList.add("show");
     }
 
     // Clear chat helper
@@ -479,6 +550,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             if (res.ok && data.success) {
                 alert(data.message);
+                
+                // Save to Sent Messages LocalStorage archive
+                sentMessages.unshift({
+                    id: "sent_" + Date.now(),
+                    email: email,
+                    subject: subject,
+                    body: body,
+                    timestamp: new Date().toLocaleString()
+                });
+                localStorage.setItem("britsync_sent", JSON.stringify(sentMessages));
+                renderSentHistorySidebar();
+                
                 emailModal.classList.remove("show");
             } else {
                 alert("Failed to deploy outbox message: " + (data.error || "Unknown error"));
@@ -493,6 +576,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Global Action: Generate Message Draft
     window.generateMessage = async (name, company, email) => {
+        // Unlock inputs for writing mode
+        document.getElementById("modal-subject").removeAttribute("readonly");
+        emailDraftText.removeAttribute("readonly");
+        sendOutboxBtn.style.display = "inline-block";
+
         // Reset modal headers for draft email mode
         document.querySelector("#email-modal h2").innerHTML = `<i class="fa-solid fa-envelope-open-text text-blue"></i> Personalized Email Draft`;
         document.getElementById("modal-to-email").value = email || "N/A";
@@ -533,6 +621,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const productDescription = prompt("Briefly describe the product/offer for this campaign:", query || "our products");
         if (!productDescription) return;
+
+        // Unlock modal fields for analysis view (read-only)
+        document.getElementById("modal-subject").setAttribute("readonly", true);
+        emailDraftText.setAttribute("readonly", true);
+        sendOutboxBtn.style.display = "none";
 
         // Customize modal headers for Campaign report mode
         document.querySelector("#email-modal h2").innerHTML = `<i class="fa-solid fa-brain text-purple"></i> Modal GPU Campaign Strategy`;

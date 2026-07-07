@@ -188,13 +188,49 @@ def get_company_news(company: str = Query(..., description="Name of the company"
     except Exception as e:
         return {"news": f"Error querying news: {str(e)}"}
 
-# 2b. Outbox Sending Endpoint
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# Load SMTP credentials from environment
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = os.getenv("SMTP_PORT")
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASS = os.getenv("SMTP_PASS")
+
+# 2b. Outbox Sending Endpoint (Real SMTP / Fallback Simulator)
 @app.post("/api/send-email")
 async def send_email_handler(req: SendEmailRequest):
-    print(f"[OUTBOUND CAMPAIGN] Sending to {req.email}...")
-    print(f"Subject: {req.subject}\nBody: {req.body}")
-    # Simulates an email or direct message send via Britsync outbox
-    return {"success": True, "message": f"Message successfully deployed to {req.email}!"}
+    print(f"[OUTBOUND CAMPAIGN] Triggering email to {req.email}...")
+    
+    if SMTP_HOST and SMTP_USER and SMTP_PASS:
+        try:
+            port = int(SMTP_PORT) if SMTP_PORT else 587
+            
+            # Create email envelope
+            msg = MIMEMultipart()
+            msg["From"] = SMTP_USER
+            msg["To"] = req.email
+            msg["Subject"] = req.subject
+            msg.attach(MIMEText(req.body, "plain"))
+            
+            # Connect to SMTP server and send
+            server = smtplib.SMTP(SMTP_HOST, port, timeout=10)
+            server.starttls()  # Secure connection
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, req.email, msg.as_string())
+            server.quit()
+            
+            print(f"[SMTP SUCCESS] Live email sent to {req.email}!")
+            return {"success": True, "message": f"Live email successfully sent to {req.email}!"}
+            
+        except Exception as e:
+            print(f"[SMTP ERROR] Failed to send email: {str(e)}")
+            return {"success": False, "error": f"Failed to send email. SMTP Error: {str(e)}"}
+    else:
+        # Fallback simulator mode
+        print(f"[SIMULATOR] Outbox message dispatched to: {req.email}")
+        return {"success": True, "message": f"Simulator: Email successfully sent to {req.email}! (Configure SMTP in your .env for real delivery)"}
 
 # 2c. Bulk Modal GPU Campaign Analyst
 @app.post("/api/analyze-campaign")

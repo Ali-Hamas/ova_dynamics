@@ -752,6 +752,29 @@ body {
     background: rgba(239, 68, 68, 0.15);
 }
 
+.delete-sent-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 6px;
+    opacity: 0; /* hidden by default, shown on hover */
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.chat-history li:hover .delete-sent-btn {
+    opacity: 1;
+}
+
+.delete-sent-btn:hover {
+    color: var(--accent-red) !important;
+    background: rgba(239, 68, 68, 0.15);
+}
+
 /* ==========================================
    MOBILE RESPONSIVENESS
    ========================================== */
