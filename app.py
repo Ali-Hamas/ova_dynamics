@@ -227,17 +227,41 @@ async def chat_handler(req: ChatRequest):
     # Force affiliate override if keywords matched
     if force_affiliate:
         intent = "affiliate_search"
-        # Extract niche from target_name
+        # Extract niche from target_name or message
         niche = target_name.replace("YouTubers", "").replace("TikTokers", "").replace("Creators", "").strip()
-        if not niche or niche == "Leads":
-            niche = "tech"
-        # Force site-specific channel queries instead of generic directory searches
-        queries = [
-            f"site:youtube.com/@ \"{niche}\" \"subscribers\"",
-            f"site:youtube.com/c/ \"{niche}\" \"about\"",
-            f"site:tiktok.com/@ \"{niche}\" \"followers\""
-        ]
-        print(f"[INFO] Programmatic Override: Forced Affiliate Search for niche '{niche}'")
+        if not niche or niche == "Leads" or niche.lower() in ["youtube", "tiktok"]:
+            # Fallback regex to find keywords before "tiktok" or "youtube"
+            niche_match = re.search(r'([a-zA-Z\s]+?)\s*(?:tiktok|youtube|creator|influencer)', message_lower)
+            niche = niche_match.group(1).strip() if niche_match else "fitness"
+        
+        # Enforce strict platform matching
+        req_youtube = "youtube" in message_lower or "youtuber" in message_lower
+        req_tiktok = "tiktok" in message_lower or "tiktoker" in message_lower
+        
+        if req_tiktok and not req_youtube:
+            # Force TikTok only
+            queries = [
+                f"site:tiktok.com/@ \"{niche}\" \"followers\"",
+                f"site:tiktok.com/@ \"{niche}\" \"fans\"",
+                f"site:tiktok.com/@ \"{niche}\" \"uk\""
+            ]
+            print(f"[INFO] Strict TikTok Search for niche: {niche}")
+        elif req_youtube and not req_tiktok:
+            # Force YouTube only
+            queries = [
+                f"site:youtube.com/@ \"{niche}\" \"subscribers\"",
+                f"site:youtube.com/c/ \"{niche}\" \"about\"",
+                f"site:youtube.com/@ \"{niche}\" \"uk\""
+            ]
+            print(f"[INFO] Strict YouTube Search for niche: {niche}")
+        else:
+            # Mixed search
+            queries = [
+                f"site:youtube.com/@ \"{niche}\" \"subscribers\"",
+                f"site:tiktok.com/@ \"{niche}\" \"followers\"",
+                f"site:youtube.com/c/ \"{niche}\" \"about\""
+            ]
+            print(f"[INFO] Mixed Creator Search for niche: {niche}")
 
     leads = []
     seen_domains = set()
@@ -255,6 +279,13 @@ async def chat_handler(req: ChatRequest):
             
             if not url or "wikipedia" in url:
                 continue
+
+            # Double-check platform matching in URLs to prevent leaks
+            if intent == "affiliate_search":
+                if req_tiktok and not req_youtube and "tiktok.com" not in url:
+                    continue
+                if req_youtube and not req_tiktok and "youtube.com" not in url:
+                    continue
 
             # Extract or generate contact details (emails and phone numbers)
             email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', snippet)
