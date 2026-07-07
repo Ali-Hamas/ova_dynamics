@@ -712,3 +712,106 @@ body {
     box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
 }
 
+/* ==========================================
+   DELETE HISTORY BUTTON
+   ========================================== */
+.chat-history li {
+    justify-content: space-between; /* space out title and delete button */
+}
+
+.history-item-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.delete-session-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 6px;
+    opacity: 0; /* hidden by default, shown on hover */
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.chat-history li:hover .delete-session-btn {
+    opacity: 1;
+}
+
+.delete-session-btn:hover {
+    color: var(--accent-red) !important;
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* ==========================================
+   MOBILE RESPONSIVENESS
+   ========================================== */
+.menu-toggle-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+    margin-right: 8px;
+    border-radius: 6px;
+    transition: var(--transition-fast);
+}
+
+.menu-toggle-btn:hover {
+    background-color: var(--bg-card);
+}
+
+@media (max-width: 768px) {
+    .menu-toggle-btn {
+        display: block; /* Show menu toggle on mobile */
+    }
+    
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -260px; /* Hidden off-screen left */
+        width: 260px;
+        height: 100vh;
+        z-index: 1000;
+        transition: all 0.3s ease;
+        box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+    }
+    
+    .sidebar.open {
+        left: 0; /* Slide in sidebar */
+    }
+    
+    .main-chat {
+        width: 100%;
+        height: 100vh;
+    }
+    
+    .suggestion-cards {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .chat-header {
+        padding: 0 16px;
+    }
+    
+    .messages-container {
+        padding: 16px;
+    }
+    
+    .chat-footer {
+        padding: 16px;
+    }
+}
+

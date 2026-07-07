@@ -1,4 +1,4 @@
-// Britsync AI Outreach Copilot - Frontend Logic with LocalStorage Chat History & Advanced Campaigns
+// Britsync AI Outreach Copilot - Frontend Logic with LocalStorage Chat History, Advanced Campaigns & Mobile Responsiveness
 
 document.addEventListener("DOMContentLoaded", () => {
     const chatForm = document.getElementById("chat-form");
@@ -14,6 +14,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // Load sessions and show sidebar
     renderSessionsSidebar();
 
+    // Mobile Sidebar Toggle Drawer
+    const menuToggleBtn = document.getElementById("menu-toggle-btn");
+    const sidebar = document.querySelector(".sidebar");
+    
+    if (menuToggleBtn && sidebar) {
+        menuToggleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            sidebar.classList.toggle("open");
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener("click", (e) => {
+            if (window.innerWidth <= 768 && sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== menuToggleBtn) {
+                sidebar.classList.remove("open");
+            }
+        });
+    }
+
     // Pre-fill input when clicking suggestions
     window.useSuggestion = (text) => {
         userInput.value = text;
@@ -27,6 +45,11 @@ document.addEventListener("DOMContentLoaded", () => {
         welcomeScreen.style.display = "block";
         userInput.value = "";
         renderSessionsSidebar();
+        
+        // Collapse sidebar on mobile
+        if (window.innerWidth <= 768 && sidebar) {
+            sidebar.classList.remove("open");
+        }
     });
 
     // Handle Form Submit
@@ -331,11 +354,50 @@ document.addEventListener("DOMContentLoaded", () => {
         sessions.forEach(session => {
             const li = document.createElement("li");
             li.className = session.id === currentSessionId ? "active" : "";
-            li.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${session.title}`;
-            li.addEventListener("click", () => loadSession(session.id));
+            
+            // Create link span
+            const linkSpan = document.createElement("span");
+            linkSpan.className = "history-item-link";
+            linkSpan.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${session.title}`;
+            linkSpan.addEventListener("click", () => {
+                loadSession(session.id);
+                // Collapse sidebar on mobile
+                if (window.innerWidth <= 768 && sidebar) {
+                    sidebar.classList.remove("open");
+                }
+            });
+
+            // Create delete button
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "delete-session-btn";
+            deleteBtn.innerHTML = `<i class="fa-solid fa-trash-can"></i>`;
+            deleteBtn.addEventListener("click", (e) => deleteSession(e, session.id));
+
+            li.appendChild(linkSpan);
+            li.appendChild(deleteBtn);
             chatHistoryList.appendChild(li);
         });
     }
+
+    // Delete Session handler (deletes local scan history)
+    window.deleteSession = (event, sessionId) => {
+        event.stopPropagation();
+        
+        if (!confirm("Are you sure you want to delete this scan history from your computer?")) {
+            return;
+        }
+
+        sessions = sessions.filter(s => s.id !== sessionId);
+        saveSessionsToStorage();
+
+        if (currentSessionId === sessionId) {
+            currentSessionId = null;
+            clearChatArea();
+            welcomeScreen.style.display = "block";
+        }
+
+        renderSessionsSidebar();
+    };
 
     // Load messages from a session into the chat area
     function loadSession(sessionId) {
