@@ -55,6 +55,10 @@ class ChatMessage(BaseModel):
     role: str
     content: str
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class ChatRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
@@ -67,6 +71,33 @@ class CallRequest(BaseModel):
 class MessageRequest(BaseModel):
     name: str
     company: str
+    use_modal_gpu: bool = False
+
+class SendEmailRequest(BaseModel):
+    email: str
+    subject: str
+    body: str
+
+class AnalyzeCampaignRequest(BaseModel):
+    leads: list[dict]
+    product_description: str
+
+def call_modal_gpu_directly(prompt: str) -> str:
+    """Helper to query the Modal GPU endpoint specifically."""
+    try:
+        headers = {
+            "Authorization": f"Bearer {MODAL_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": MODAL_MODEL_NAME,
+            "prompt": prompt,
+            "stream": False
+        }
+        res = requests.post(MODAL_API_URL, json=payload, headers=headers, timeout=60)
+        return res.json().get("response", "").strip()
+    except Exception as e:
+        return f"Error connecting to Modal GPU: {str(e)}"
 
 def call_llm(prompt: str) -> str:
     """Helper to query Groq or Modal GPU."""
@@ -88,20 +119,7 @@ def call_llm(prompt: str) -> str:
             pass
             
     # Fallback to Modal GPU
-    try:
-        headers = {
-            "Authorization": f"Bearer {MODAL_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": MODAL_MODEL_NAME,
-            "prompt": prompt,
-            "stream": False
-        }
-        res = requests.post(MODAL_API_URL, json=payload, headers=headers, timeout=60)
-        return res.json().get("response", "").strip()
-    except Exception as e:
-        return f"Error connecting to LLM: {str(e)}"
+    return call_modal_gpu_directly(prompt)
 
 def search_tavily(query: str) -> list:
     url = "https://api.tavily.com/search"
@@ -169,6 +187,40 @@ def get_company_news(company: str = Query(..., description="Name of the company"
         return {"news": combined_news}
     except Exception as e:
         return {"news": f"Error querying news: {str(e)}"}
+
+# 2b. Outbox Sending Endpoint
+@app.post("/api/send-email")
+async def send_email_handler(req: SendEmailRequest):
+    print(f"[OUTBOUND CAMPAIGN] Sending to {req.email}...")
+    print(f"Subject: {req.subject}\nBody: {req.body}")
+    # Simulates an email or direct message send via Britsync outbox
+    return {"success": True, "message": f"Message successfully deployed to {req.email}!"}
+
+# 2c. Bulk Modal GPU Campaign Analyst
+@app.post("/api/analyze-campaign")
+async def analyze_campaign_handler(req: AnalyzeCampaignRequest):
+    leads_summary = ""
+    for i, lead in enumerate(req.leads[:5]):
+        leads_summary += f"{i+1}. {lead.get('Name')} ({lead.get('Company')}) - Niche/Desc: {lead.get('Description')}\n"
+
+    prompt = f"""
+    You are an expert sales strategist representing Britsync.
+    
+    Here is a list of target leads extracted for our product: "{req.product_description}"
+    
+    Leads List:
+    {leads_summary}
+    
+    Using your advanced reasoning, analyze these leads as a cohort and write a 3-step Campaign Strategy:
+    1. Cohort Classification: Group these leads by type.
+    2. Value Proposition Strategy: Suggest a tailored pitch angle for each group.
+    3. Action Plan: Recommend the exact sequence of emails, DMs, or calls to convert them.
+    
+    Keep your response concise, professional, and business-focused. Format it cleanly with markdown.
+    """
+    
+    analysis = call_modal_gpu_directly(prompt)
+    return {"analysis": analysis}
 
 # 3. Chat Endpoint (Agentic Scraper Pipeline with LLM Intent Parsing)
 @app.post("/api/chat")
@@ -290,6 +342,9 @@ async def chat_handler(req: ChatRequest):
             # Extract or generate contact details (emails and phone numbers)
             email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', snippet)
             phone_match = re.search(r'(\+44\s?\d{4}|\b0\d{4})\s?\d{6}\b|(\+1\s?\d{3}|\b\d{3})-\d{3}-\d{4}', snippet)
+            
+            email = email_match.group(0) if email_match else None
+            phone = phone_match.group(0) if phone_match else None
 
             if intent == "affiliate_search":
                 # Scrape Social Creator Profiles (must contain profile URL structure)
@@ -300,18 +355,30 @@ async def chat_handler(req: ChatRequest):
                 if url not in seen_urls:
                     seen_urls.add(url)
                     
-                    # Extract follower estimate from snippet if present
-                    followers = "10k-100k subscribers"
-                    fol_match = re.search(r'(\d+k|\d+m|\d+,\d+)\s*(?:followers|subscribers|subs|subscribers)', snippet, re.IGNORECASE)
-                    if fol_match:
-                        followers = fol_match.group(0).lower()
-                        
                     # Extract username handle cleanly from URL
                     handle = "@" + url.split("/@")[-1] if "/@" in url else ("@" + url.split("/c/")[-1] if "/c/" in url else "Creator")
                     if "/" in handle:
                         handle = handle.split("/")[0]
                     if "?" in handle:
                         handle = handle.split("?")[0]
+
+                    # SECOND-PASS SCRAPE: If no email was found in the initial snippet, search specifically for contact info
+                    if not email:
+                        print(f"[CONTACT SCRAPER] Running second-pass search for creator: {handle}")
+                        contact_results = search_tavily(f'"{handle}" business email OR contact OR booking OR "linktr.ee"')
+                        for cr in contact_results:
+                            c_snippet = cr.get("content", "")
+                            c_email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', c_snippet)
+                            if c_email_match:
+                                email = c_email_match.group(0)
+                                print(f"[SUCCESS] Found real email: {email}")
+                                break
+                    
+                    # Extract follower estimate from snippet if present
+                    followers = "10k-100k subscribers"
+                    fol_match = re.search(r'(\d+k|\d+m|\d+,\d+)\s*(?:followers|subscribers|subs|subscribers)', snippet, re.IGNORECASE)
+                    if fol_match:
+                        followers = fol_match.group(0).lower()
                     
                     # Attempt to extract owner's real name from title or snippet
                     owner_name = "N/A"
@@ -322,8 +389,8 @@ async def chat_handler(req: ChatRequest):
                         owner_name = title.replace(" - YouTube", "").strip()
 
                     platform = "YouTube" if "youtube.com" in url else ("TikTok" if "tiktok.com" in url else "Instagram")
-                    email = email_match.group(0) if email_match else f"business@{handle.replace('@', '')}.com"
-                    phone = phone_match.group(0) if phone_match else "N/A (Social DM Only)"
+                    email = email if email else "N/A (Social DM Only)"
+                    phone = phone if phone else "N/A (Social DM Only)"
                     
                     leads.append({
                         "Name": handle,
@@ -345,8 +412,21 @@ async def chat_handler(req: ChatRequest):
 
                 if domain not in seen_domains:
                     seen_domains.add(domain)
-                    email = email_match.group(0) if email_match else f"info@{domain.replace('www.', '')}"
-                    phone = phone_match.group(0) if phone_match else "+44 20 7946 0192"
+
+                    # SECOND-PASS SCRAPE: If no B2B email was found, search their contact/about pages specifically
+                    if not email:
+                        print(f"[CONTACT SCRAPER] Running second-pass search for business: {domain}")
+                        contact_results = search_tavily(f'site:{domain} "email" OR "contact" OR "about"')
+                        for cr in contact_results:
+                            c_snippet = cr.get("content", "")
+                            c_email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', c_snippet)
+                            if c_email_match:
+                                email = c_email_match.group(0)
+                                print(f"[SUCCESS] Found real B2B email: {email}")
+                                break
+
+                    email = email if email else f"info@{domain.replace('www.', '')} (Fallback)"
+                    phone = phone if phone else "+44 20 7946 0192"
                     
                     leads.append({
                         "Name": title.split(" - ")[0] if " - " in title else title,
@@ -451,7 +531,10 @@ async def generate_message_handler(req: MessageRequest):
         Keep it conversational, professional, and clean. Do not include subject lines or email signatures. Just the body text.
         """
     
-    message_draft = call_llm(prompt)
+    if req.use_modal_gpu:
+        message_draft = call_modal_gpu_directly(prompt)
+    else:
+        message_draft = call_llm(prompt)
     return {"message": message_draft}
 
 if __name__ == "__main__":

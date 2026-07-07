@@ -121,12 +121,23 @@
                 <h2><i class="fa-solid fa-envelope-open-text text-blue"></i> Personalized Email Draft</h2>
                 <span class="close-modal" id="close-modal">&times;</span>
             </div>
-            <div class="modal-body">
-                <textarea id="email-draft-text" readonly></textarea>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="font-weight: bold; width: 80px; color: var(--text-secondary);">To:</span>
+                    <input type="text" id="modal-to-email" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 13px;" readonly>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="font-weight: bold; width: 80px; color: var(--text-secondary);">Subject:</span>
+                    <input type="text" id="modal-subject" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 13px;" value="Partnership / Collaboration Inquiry with Britsync">
+                </div>
+                <textarea id="email-draft-text" style="height: 180px;"></textarea>
             </div>
             <div class="modal-footer">
                 <button class="action-btn call-btn" id="copy-draft-btn">
                     <i class="fa-solid fa-copy"></i> Copy to Clipboard
+                </button>
+                <button class="action-btn" id="send-outbox-btn" style="background: var(--accent-purple); color: white; margin-left: 10px; border: none; cursor: pointer;">
+                    <i class="fa-solid fa-paper-plane"></i> Send Outbox
                 </button>
             </div>
         </div>

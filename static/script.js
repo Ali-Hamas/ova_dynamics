@@ -1,4 +1,4 @@
-// Britsync AI Outreach Copilot - Frontend Logic with LocalStorage Chat History
+// Britsync AI Outreach Copilot - Frontend Logic with LocalStorage Chat History & Advanced Campaigns
 
 document.addEventListener("DOMContentLoaded", () => {
     const chatForm = document.getElementById("chat-form");
@@ -96,10 +96,38 @@ document.addEventListener("DOMContentLoaded", () => {
             responseText.textContent = data.response || "I couldn't generate a response.";
             contentDiv.appendChild(responseText);
 
-            // Render Leads Grid if leads are present
+            // Render Tabs and Leads Grid if leads are present
             let leadsData = null;
             if (data.leads && data.leads.length > 0) {
                 leadsData = data.leads;
+
+                // 1. Render Campaign Analysis and Tabs Filter controls
+                const controlsWrapper = document.createElement("div");
+                controlsWrapper.style = "display: flex; justify-content: space-between; align-items: center; margin-top: 15px; flex-wrap: wrap; gap: 10px;";
+                
+                const tabsDiv = document.createElement("div");
+                tabsDiv.className = "leads-tabs";
+                tabsDiv.innerHTML = `
+                    <button class="tab-btn active" onclick="filterLeads(this, 'all')">All Leads</button>
+                    <button class="tab-btn" onclick="filterLeads(this, 'youtube')"><i class="fa-brands fa-youtube" style="color: #ff0000;"></i> YouTubers</button>
+                    <button class="tab-btn" onclick="filterLeads(this, 'tiktok')"><i class="fa-brands fa-tiktok"></i> TikTokers</button>
+                    <button class="tab-btn" onclick="filterLeads(this, 'client')"><i class="fa-solid fa-briefcase" style="color: var(--accent-blue);"></i> B2B Clients</button>
+                `;
+
+                const campaignBtn = document.createElement("button");
+                campaignBtn.className = "action-btn campaign-btn";
+                campaignBtn.style = "background: var(--accent-purple); color: white; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; padding: 6px 14px; border-radius: 20px;";
+                campaignBtn.innerHTML = `<i class="fa-solid fa-brain"></i> Modal GPU Campaign Writer`;
+                
+                // Keep reference to leadsData via closure
+                const currentLeads = [...leadsData];
+                campaignBtn.onclick = () => analyzeLeadsCampaign(currentLeads, query);
+
+                controlsWrapper.appendChild(tabsDiv);
+                controlsWrapper.appendChild(campaignBtn);
+                contentDiv.appendChild(controlsWrapper);
+
+                // 2. Render Grid
                 const gridDiv = document.createElement("div");
                 gridDiv.className = "leads-grid";
 
@@ -115,7 +143,8 @@ document.addEventListener("DOMContentLoaded", () => {
             session.messages.push({ 
                 sender: "ai", 
                 text: data.response || "", 
-                leads: leadsData 
+                leads: leadsData,
+                query: query // store the search query used
             });
             saveSessionsToStorage();
 
@@ -129,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Helper: Create Chat Message bubble
-    function appendMessage(text, sender, isLoading = false, leads = null) {
+    function appendMessage(text, sender, isLoading = false, leads = null, query = "") {
         const messageDiv = document.createElement("div");
         messageDiv.className = `message message-${sender}`;
 
@@ -154,8 +183,30 @@ document.addEventListener("DOMContentLoaded", () => {
             p.textContent = text;
             contentDiv.appendChild(p);
 
-            // If history load contains leads, render the grid
+            // If history load contains leads, render the tabs and grid
             if (leads && leads.length > 0) {
+                const controlsWrapper = document.createElement("div");
+                controlsWrapper.style = "display: flex; justify-content: space-between; align-items: center; margin-top: 15px; flex-wrap: wrap; gap: 10px;";
+                
+                const tabsDiv = document.createElement("div");
+                tabsDiv.className = "leads-tabs";
+                tabsDiv.innerHTML = `
+                    <button class="tab-btn active" onclick="filterLeads(this, 'all')">All Leads</button>
+                    <button class="tab-btn" onclick="filterLeads(this, 'youtube')"><i class="fa-brands fa-youtube" style="color: #ff0000;"></i> YouTubers</button>
+                    <button class="tab-btn" onclick="filterLeads(this, 'tiktok')"><i class="fa-brands fa-tiktok"></i> TikTokers</button>
+                    <button class="tab-btn" onclick="filterLeads(this, 'client')"><i class="fa-solid fa-briefcase" style="color: var(--accent-blue);"></i> B2B Clients</button>
+                `;
+
+                const campaignBtn = document.createElement("button");
+                campaignBtn.className = "action-btn campaign-btn";
+                campaignBtn.style = "background: var(--accent-purple); color: white; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; padding: 6px 14px; border-radius: 20px;";
+                campaignBtn.innerHTML = `<i class="fa-solid fa-brain"></i> Modal GPU Campaign Writer`;
+                campaignBtn.onclick = () => analyzeLeadsCampaign(leads, query || "our products");
+
+                controlsWrapper.appendChild(tabsDiv);
+                controlsWrapper.appendChild(campaignBtn);
+                contentDiv.appendChild(controlsWrapper);
+
                 const gridDiv = document.createElement("div");
                 gridDiv.className = "leads-grid";
                 leads.forEach(lead => {
@@ -177,14 +228,18 @@ document.addEventListener("DOMContentLoaded", () => {
     function createLeadCard(lead) {
         const card = document.createElement("div");
         card.className = "lead-card";
+        
+        // Save metadata on card elements for filtering
+        card.setAttribute("data-type", lead.Type);
+        card.setAttribute("data-company", lead.Company);
 
         const title = lead.Name || lead.Company || "Target Lead";
         const company = lead.Company || "N/A";
         const website = lead.Website || "#";
         const description = lead.Description || "No description provided.";
+        const email = lead.Email || "info@domain.com";
 
         if (lead.Type === "Affiliate/Influencer") {
-            // Affiliate / Social Media Influencer Card
             card.innerHTML = `
                 <div>
                     <div class="lead-card-header">
@@ -195,7 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     <p class="lead-desc">${description}</p>
                     <div class="lead-contact-info" style="margin-top:10px; font-size:11px; display:flex; flex-direction:column; gap:4px; opacity:0.85;">
-                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-envelope" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Email || "N/A"}</span>
+                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-envelope" style="color:var(--accent-blue); width: 14px;"></i> ${email}</span>
                         <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-phone" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Phone || "N/A"}</span>
                     </div>
                 </div>
@@ -203,13 +258,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     <a href="${website}" target="_blank" class="action-btn call-btn" style="text-decoration:none;">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Profile
                     </a>
-                    <button class="action-btn secondary-btn" onclick="generateMessage('${title}', '${company}')">
+                    <button class="action-btn secondary-btn" onclick="generateMessage('${title}', '${company}', '${email}')">
                         <i class="fa-solid fa-comment-dots"></i> Draft DM
                     </button>
                 </div>
             `;
         } else {
-            // B2B Business Client Card
             card.innerHTML = `
                 <div>
                     <div class="lead-card-header">
@@ -220,7 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     <p class="lead-desc">${description}</p>
                     <div class="lead-contact-info" style="margin-top:10px; font-size:11px; display:flex; flex-direction:column; gap:4px; opacity:0.85;">
-                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-envelope" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Email || "N/A"}</span>
+                        <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-envelope" style="color:var(--accent-blue); width: 14px;"></i> ${email}</span>
                         <span style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-phone" style="color:var(--accent-blue); width: 14px;"></i> ${lead.Phone || "N/A"}</span>
                     </div>
                 </div>
@@ -228,7 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <button class="action-btn call-btn" onclick="triggerCall('${title}', '${company}')">
                         <i class="fa-solid fa-phone"></i> Call Lead
                     </button>
-                    <button class="action-btn secondary-btn" onclick="generateMessage('${title}', '${company}')">
+                    <button class="action-btn secondary-btn" onclick="generateMessage('${title}', '${company}', '${email}')">
                         <i class="fa-solid fa-envelope"></i> Draft Email
                     </button>
                 </div>
@@ -237,6 +291,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return card;
     }
+
+    // Tab Filter Helper
+    window.filterLeads = (btn, type) => {
+        const parent = btn.parentElement;
+        parent.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const grid = parent.parentElement.nextElementSibling;
+        if (grid && grid.classList.contains("leads-grid")) {
+            grid.querySelectorAll(".lead-card").forEach(card => {
+                const cardType = card.getAttribute("data-type");
+                const cardCompany = card.getAttribute("data-company").toLowerCase();
+                
+                if (type === "all") {
+                    card.style.display = "flex";
+                } else if (type === "youtube" && cardCompany.includes("youtube")) {
+                    card.style.display = "flex";
+                } else if (type === "tiktok" && cardCompany.includes("tiktok")) {
+                    card.style.display = "flex";
+                } else if (type === "client" && cardType === "Business Client") {
+                    card.style.display = "flex";
+                } else {
+                    card.style.display = "none";
+                }
+            });
+        }
+    };
 
     // Load sessions and render sidebar list
     function renderSessionsSidebar() {
@@ -265,7 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const session = sessions.find(s => s.id === sessionId);
         if (session && session.messages) {
             session.messages.forEach(msg => {
-                appendMessage(msg.text, msg.sender, false, msg.leads);
+                appendMessage(msg.text, msg.sender, false, msg.leads, msg.query);
             });
         }
         
@@ -287,6 +368,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeModal = document.getElementById("close-modal");
     const emailDraftText = document.getElementById("email-draft-text");
     const copyDraftBtn = document.getElementById("copy-draft-btn");
+    const sendOutboxBtn = document.getElementById("send-outbox-btn");
 
     // Close Modal Event
     closeModal.addEventListener("click", () => {
@@ -312,8 +394,48 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 2000);
     });
 
+    // Send Outbox Button Handler
+    sendOutboxBtn.addEventListener("click", async () => {
+        const email = document.getElementById("modal-to-email").value;
+        const subject = document.getElementById("modal-subject").value;
+        const body = emailDraftText.value;
+
+        if (!email || email === "N/A" || email.includes("Social DM")) {
+            alert("This lead requires a social DM (like TikTok/Instagram). Please copy the message and send it directly.");
+            return;
+        }
+
+        sendOutboxBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Deploying...`;
+
+        try {
+            const res = await fetch("/api/send-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, subject, body })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert(data.message);
+                emailModal.classList.remove("show");
+            } else {
+                alert("Failed to deploy outbox message: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            alert("Error sending message via outbox.");
+            console.error(error);
+        } finally {
+            sendOutboxBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send Outbox`;
+        }
+    });
+
     // Global Action: Generate Message Draft
-    window.generateMessage = async (name, company) => {
+    window.generateMessage = async (name, company, email) => {
+        // Reset modal headers for draft email mode
+        document.querySelector("#email-modal h2").innerHTML = `<i class="fa-solid fa-envelope-open-text text-blue"></i> Personalized Email Draft`;
+        document.getElementById("modal-to-email").value = email || "N/A";
+        document.getElementById("modal-subject").value = `Partnership / Collaboration Inquiry with Britsync`;
+        
         emailDraftText.value = "Drafting personalized message for you...";
         emailModal.classList.add("show");
 
@@ -323,7 +445,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: name,
-                    company: company
+                    company: company,
+                    use_modal_gpu: true // Force Modal GPU 70B model to write response
                 })
             });
 
@@ -335,6 +458,46 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } catch (error) {
             emailDraftText.value = "Error connecting to message generation API.";
+            console.error(error);
+        }
+    };
+
+    // Global Action: Bulk Modal GPU Campaign Analyzer
+    window.analyzeLeadsCampaign = async (leads, query) => {
+        if (!leads || leads.length === 0) {
+            alert("No leads found in this scan to analyze!");
+            return;
+        }
+
+        const productDescription = prompt("Briefly describe the product/offer for this campaign:", query || "our products");
+        if (!productDescription) return;
+
+        // Customize modal headers for Campaign report mode
+        document.querySelector("#email-modal h2").innerHTML = `<i class="fa-solid fa-brain text-purple"></i> Modal GPU Campaign Strategy`;
+        document.getElementById("modal-to-email").value = "All Cohort Leads";
+        document.getElementById("modal-subject").value = `Strategic Campaign Plan: ${productDescription}`;
+
+        emailDraftText.value = "Your custom Modal GPU 70B is analyzing the scanned leads cohort. Writing strategy, please wait...";
+        emailModal.classList.add("show");
+
+        try {
+            const res = await fetch("/api/analyze-campaign", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    leads: leads,
+                    product_description: productDescription
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.analysis) {
+                emailDraftText.value = data.analysis;
+            } else {
+                emailDraftText.value = "Failed to generate campaign strategy: " + (data.error || "Unknown error");
+            }
+        } catch (error) {
+            emailDraftText.value = "Error connecting to Modal GPU Campaign Analyzer.";
             console.error(error);
         }
     };
