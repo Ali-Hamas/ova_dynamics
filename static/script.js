@@ -59,6 +59,14 @@ document.addEventListener("DOMContentLoaded", () => {
         bulkPanel.style.display = "flex";
         panelTitleHeader.textContent = "Bulk Campaign Manager";
 
+        // Reset Tab active state in Bulk Panel
+        const bulkTabs = document.getElementById("bulk-leads-tabs");
+        if (bulkTabs) {
+            bulkTabs.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            const firstTab = bulkTabs.querySelector(".tab-btn");
+            if (firstTab) firstTab.classList.add("active");
+        }
+
         // Render Directory
         renderBulkLeadsTable();
 
@@ -68,13 +76,55 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Select/Deselect All Bulk Checkboxes
+    // Select/Deselect All Bulk Checkboxes (Only affects visible filtered rows)
     if (selectAllBulk) {
         selectAllBulk.addEventListener("change", () => {
-            const checkboxes = bulkLeadsTbody.querySelectorAll(".bulk-lead-checkbox");
-            checkboxes.forEach(cb => cb.checked = selectAllBulk.checked);
+            const rows = bulkLeadsTbody.querySelectorAll("tr");
+            rows.forEach(tr => {
+                if (tr.style.display !== "none") {
+                    const cb = tr.querySelector(".bulk-lead-checkbox");
+                    if (cb && !cb.disabled) {
+                        cb.checked = selectAllBulk.checked;
+                    }
+                }
+            });
         });
     }
+
+    // Table Filter function for Bulk Directory
+    window.filterBulkLeads = (btn, type) => {
+        const parent = btn.parentElement;
+        parent.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const rows = bulkLeadsTbody.querySelectorAll("tr");
+        rows.forEach(tr => {
+            const leadType = tr.getAttribute("data-type");
+            const leadPlatform = tr.getAttribute("data-company") ? tr.getAttribute("data-company").toLowerCase() : "";
+
+            let matches = false;
+            if (type === "all") {
+                matches = true;
+            } else if (type === "youtube" && leadPlatform.includes("youtube")) {
+                matches = true;
+            } else if (type === "tiktok" && leadPlatform.includes("tiktok")) {
+                matches = true;
+            } else if (type === "client" && leadType === "Business Client") {
+                matches = true;
+            }
+
+            if (matches) {
+                tr.style.display = "";
+            } else {
+                tr.style.display = "none";
+            }
+        });
+
+        // Untick Select All on filter switch
+        if (selectAllBulk) selectAllBulk.checked = false;
+        const checkboxes = bulkLeadsTbody.querySelectorAll(".bulk-lead-checkbox");
+        checkboxes.forEach(cb => cb.checked = false);
+    };
 
     // Run Bulk Outreach Campaign (Async Loop)
     if (runBulkBtn) {
@@ -213,6 +263,10 @@ document.addEventListener("DOMContentLoaded", () => {
         allLeads.forEach(lead => {
             const tr = document.createElement("tr");
             tr.style.borderBottom = "1px solid var(--border-color)";
+            
+            // Set metadata attributes on the table row for tab filtering
+            tr.setAttribute("data-type", lead.Type);
+            tr.setAttribute("data-company", lead.Company);
 
             const email = lead.Email || "N/A (Social DM Only)";
             const canEmail = email !== "N/A (Social DM Only)" && !email.includes("Social DM");

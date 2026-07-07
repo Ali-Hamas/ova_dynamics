@@ -165,7 +165,15 @@
 
                 <!-- Directory Leads Table -->
                 <div class="lead-card" style="padding: 20px;">
-                    <h3 style="color: white; font-size: 15px; font-weight: 600; margin-bottom: 15px;">2. Scraped Lead Directory</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <h3 style="color: white; font-size: 15px; font-weight: 600; margin: 0;">2. Scraped Lead Directory</h3>
+                        <div class="leads-tabs" id="bulk-leads-tabs">
+                            <button class="tab-btn active" onclick="filterBulkLeads(this, 'all')">All Leads</button>
+                            <button class="tab-btn" onclick="filterBulkLeads(this, 'youtube')"><i class="fa-brands fa-youtube" style="color: #ff0000;"></i> YouTubers</button>
+                            <button class="tab-btn" onclick="filterBulkLeads(this, 'tiktok')"><i class="fa-brands fa-tiktok"></i> TikTokers</button>
+                            <button class="tab-btn" onclick="filterBulkLeads(this, 'client')"><i class="fa-solid fa-briefcase" style="color: var(--accent-blue);"></i> B2B Clients</button>
+                        </div>
+                    </div>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
                             <thead>
