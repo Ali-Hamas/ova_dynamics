@@ -286,13 +286,13 @@ async def chat_handler(req: ChatRequest):
     Identify what product/service the user is selling, determine who their ideal customers/clients would be, and generate queries to find the official websites of these potential clients.
     
     CRITICAL RULES:
-    1. DO NOT search for the product/service category itself. (For example, if they sell a "course platform like Udemy", DO NOT search for "course platforms". Instead, search for potential clients who would want to host courses, such as "private tutoring schools", "independent bootcamps", "coaching academies", or "tutor directories").
+    1. DO NOT search for the product/service category itself. (For example, if they sell an "AI video generator", DO NOT search for "video generators" or "AI video ads". Instead, search for potential clients who need video services, such as "digital marketing agencies", "social media management agencies", "advertising firms", "e-commerce brands", or "content creators").
     2. NEVER include words like "top 10", "best", "review", "platform", "comparison", "list" in the search queries. These return articles instead of real leads.
     3. Ensure queries target official business websites with contact pages in target locations (default to UK if not specified).
     
     Output a JSON object with the following fields:
     - "intent": "client_search" or "affiliate_search"
-    - "target_name": A short 2-word description of the potential client (e.g. "Private Academies", "Tutor Agencies", "Coding Bootcamps")
+    - "target_name": A short 2-word description of the potential client (e.g. "Marketing Agencies", "Tutor Agencies", "E-commerce Brands")
     - "queries": A list of 3 highly targeted search queries designed to return official business websites of these target clients.
     
     Provide ONLY the raw JSON. Do not write any markdown blocks or explanations.

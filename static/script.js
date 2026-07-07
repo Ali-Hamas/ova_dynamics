@@ -9,6 +9,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatHistoryList = document.getElementById("chat-history");
     const sentHistoryList = document.getElementById("sent-history-list");
 
+    // Bulk Panel Elements
+    const bulkOutreachNavBtn = document.getElementById("bulk-outreach-nav-btn");
+    const chatPanel = document.getElementById("chat-panel");
+    const bulkPanel = document.getElementById("bulk-panel");
+    const panelTitleHeader = document.getElementById("panel-title-header");
+    const bulkLeadsTbody = document.getElementById("bulk-leads-tbody");
+    const selectAllBulk = document.getElementById("select-all-bulk");
+    const runBulkBtn = document.getElementById("run-bulk-btn");
+    const bulkProgressContainer = document.getElementById("bulk-progress-container");
+    const bulkProgressStatus = document.getElementById("bulk-progress-status");
+    const bulkProgressPercent = document.getElementById("bulk-progress-percent");
+    const bulkProgressBar = document.getElementById("bulk-progress-bar");
+
     let sessions = JSON.parse(localStorage.getItem("britsync_sessions") || "[]");
     let sentMessages = JSON.parse(localStorage.getItem("britsync_sent") || "[]");
     let currentSessionId = null;
@@ -35,6 +48,194 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Navigation: Switch to Bulk Outreach Screen
+    bulkOutreachNavBtn.addEventListener("click", () => {
+        currentSessionId = null;
+        chatHistoryList.querySelectorAll("li").forEach(li => li.classList.remove("active"));
+        bulkOutreachNavBtn.classList.add("active");
+        
+        // Toggle Panels
+        chatPanel.style.display = "none";
+        bulkPanel.style.display = "flex";
+        panelTitleHeader.textContent = "Bulk Campaign Manager";
+
+        // Render Directory
+        renderBulkLeadsTable();
+
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768 && sidebar) {
+            sidebar.classList.remove("open");
+        }
+    });
+
+    // Select/Deselect All Bulk Checkboxes
+    if (selectAllBulk) {
+        selectAllBulk.addEventListener("change", () => {
+            const checkboxes = bulkLeadsTbody.querySelectorAll(".bulk-lead-checkbox");
+            checkboxes.forEach(cb => cb.checked = selectAllBulk.checked);
+        });
+    }
+
+    // Run Bulk Outreach Campaign (Async Loop)
+    if (runBulkBtn) {
+        runBulkBtn.addEventListener("click", async () => {
+            const checkedBoxes = bulkLeadsTbody.querySelectorAll(".bulk-lead-checkbox:checked");
+            const productDesc = document.getElementById("bulk-product").value.trim();
+            const limitVal = parseInt(document.getElementById("bulk-limit").value) || 5;
+
+            if (checkedBoxes.length === 0) {
+                alert("Please select at least one lead from the directory list!");
+                return;
+            }
+
+            if (!productDesc) {
+                alert("Please write a campaign pitch or product description first!");
+                return;
+            }
+
+            // Gathers selected queue limited by batch size
+            const queue = [];
+            checkedBoxes.forEach((cb, idx) => {
+                if (idx < limitVal) {
+                    queue.push({
+                        name: cb.getAttribute("data-name"),
+                        company: cb.getAttribute("data-company"),
+                        email: cb.getAttribute("data-email")
+                    });
+                }
+            });
+
+            if (!confirm(`Launch automated email campaign targeting ${queue.length} leads now?`)) {
+                return;
+            }
+
+            // Start Progress UI
+            runBulkBtn.disabled = true;
+            runBulkBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Campaign Active...`;
+            bulkProgressContainer.style.display = "flex";
+            
+            let successCount = 0;
+            const total = queue.length;
+
+            for (let i = 0; i < total; i++) {
+                const lead = queue[i];
+                const percent = Math.round(((i) / total) * 100);
+                
+                bulkProgressStatus.textContent = `[${i+1}/${total}] Drafting email for ${lead.name} (${lead.email}) via Modal GPU...`;
+                bulkProgressPercent.textContent = `${percent}%`;
+                bulkProgressBar.style.width = `${percent}%`;
+
+                try {
+                    // 1. Generate message using Modal GPU
+                    const genRes = await fetch("/api/generate-message", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: lead.name,
+                            company: lead.company,
+                            use_modal_gpu: true
+                        })
+                    });
+                    const genData = await genRes.json();
+                    const emailBody = genRes.ok && genData.message ? genData.message : `Hello ${lead.name}, I wanted to reach out regarding our ${productDesc}. Let me know if you have 5 minutes.`;
+
+                    // 2. Deploy email via SMTP
+                    bulkProgressStatus.textContent = `[${i+1}/${total}] Sending email to ${lead.email} via SMTP...`;
+                    const sendRes = await fetch("/api/send-email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            email: lead.email,
+                            subject: `Collaboration Inquiry regarding ${productDesc.substring(0, 30)}...`,
+                            body: emailBody
+                        })
+                    });
+                    const sendData = await sendRes.json();
+
+                    if (sendRes.ok && sendData.success) {
+                        successCount++;
+                        // Archive in Sent Messages log
+                        sentMessages.unshift({
+                            id: "sent_" + Date.now() + "_" + i,
+                            email: lead.email,
+                            subject: `Collaboration Inquiry regarding ${productDesc.substring(0, 30)}...`,
+                            body: emailBody,
+                            timestamp: new Date().toLocaleString()
+                        });
+                        localStorage.setItem("britsync_sent", JSON.stringify(sentMessages));
+                        renderSentHistorySidebar();
+                    }
+
+                } catch (error) {
+                    console.error("Outreach campaign step error:", error);
+                }
+
+                // Delay 2 seconds between emails to prevent SMTP limits
+                await new Promise(r => setTimeout(r, 2000));
+            }
+
+            // Finish Progress UI
+            bulkProgressStatus.textContent = `Campaign Completed! ${successCount} of ${total} emails sent successfully.`;
+            bulkProgressPercent.textContent = `100%`;
+            bulkProgressBar.style.width = `100%`;
+            runBulkBtn.disabled = false;
+            runBulkBtn.innerHTML = `<i class="fa-solid fa-rocket"></i> Start Automated Campaign`;
+
+            alert(`Campaign finished! ${successCount} emails successfully sent and archived in your outbox logs.`);
+        });
+    }
+
+    // Gathers and displays all unique leads scraped across all chat sessions
+    function renderBulkLeadsTable() {
+        bulkLeadsTbody.innerHTML = "";
+        let allLeads = [];
+
+        sessions.forEach(session => {
+            if (session.messages) {
+                session.messages.forEach(msg => {
+                    if (msg.leads) {
+                        msg.leads.forEach(lead => {
+                            // Check for duplicates
+                            if (!allLeads.find(l => l.Website === lead.Website)) {
+                                allLeads.push(lead);
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        if (allLeads.length === 0) {
+            bulkLeadsTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-secondary);">No target leads scraped yet. Go back to chat and run a scan!</td></tr>`;
+            return;
+        }
+
+        allLeads.forEach(lead => {
+            const tr = document.createElement("tr");
+            tr.style.borderBottom = "1px solid var(--border-color)";
+
+            const email = lead.Email || "N/A (Social DM Only)";
+            const canEmail = email !== "N/A (Social DM Only)" && !email.includes("Social DM");
+
+            tr.innerHTML = `
+                <td style="padding: 10px 8px;">
+                    <input type="checkbox" class="bulk-lead-checkbox" 
+                        data-name="${lead.Name}" 
+                        data-company="${lead.Company}" 
+                        data-email="${email}" 
+                        ${canEmail ? "checked" : "disabled"}>
+                </td>
+                <td style="padding: 10px 8px; font-weight: 500; color: white;">${lead.Name}</td>
+                <td style="padding: 10px 8px;">${lead.Company}</td>
+                <td style="padding: 10px 8px; color: var(--accent-blue);">${email}</td>
+                <td style="padding: 10px 8px;">
+                    <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); border-radius: 4px; padding: 2px 8px;">${lead.Type}</span>
+                </td>
+            `;
+            bulkLeadsTbody.appendChild(tr);
+        });
+    }
+
     // Pre-fill input when clicking suggestions
     window.useSuggestion = (text) => {
         userInput.value = text;
@@ -47,6 +248,13 @@ document.addEventListener("DOMContentLoaded", () => {
         clearChatArea();
         welcomeScreen.style.display = "block";
         userInput.value = "";
+        
+        // Reset panels
+        chatPanel.style.display = "flex";
+        bulkPanel.style.display = "none";
+        panelTitleHeader.textContent = "Outreach Copilot";
+        bulkOutreachNavBtn.classList.remove("active");
+
         renderSessionsSidebar();
         
         // Collapse sidebar on mobile
@@ -456,6 +664,12 @@ document.addEventListener("DOMContentLoaded", () => {
         clearChatArea();
         welcomeScreen.style.display = "none";
         
+        // Reset panels
+        chatPanel.style.display = "flex";
+        bulkPanel.style.display = "none";
+        panelTitleHeader.textContent = "Outreach Copilot";
+        bulkOutreachNavBtn.classList.remove("active");
+
         const session = sessions.find(s => s.id === sessionId);
         if (session && session.messages) {
             session.messages.forEach(msg => {

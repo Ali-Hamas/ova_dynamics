@@ -17,13 +17,16 @@
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
+            <div class="sidebar-header" style="flex-direction: column; gap: 10px; align-items: stretch; height: auto; padding-bottom: 15px;">
+                <div class="logo" style="margin-bottom: 5px; display: flex; align-items: center; gap: 8px;">
                     <span class="logo-dot"></span>
                     <h2>Britsync</h2>
                 </div>
                 <button class="new-chat-btn" id="new-chat-btn">
                     <i class="fa-solid fa-plus"></i> New Scan
+                </button>
+                <button class="new-chat-btn" id="bulk-outreach-nav-btn" style="background: rgba(168, 85, 247, 0.12); border-color: var(--accent-purple); color: white; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fa-solid fa-bolt"></i> Bulk Outreach
                 </button>
             </div>
             
@@ -64,7 +67,7 @@
                     <button class="menu-toggle-btn" id="menu-toggle-btn" aria-label="Toggle Sidebar">
                         <i class="fa-solid fa-bars"></i>
                     </button>
-                    <h1>Outreach Copilot</h1>
+                    <h1 id="panel-title-header">Outreach Copilot</h1>
                     <span class="badge">v1.0</span>
                 </div>
                 <div class="header-actions">
@@ -74,52 +77,113 @@
                 </div>
             </header>
 
-            <!-- Chat Messages Container -->
-            <div class="messages-container" id="messages-container">
-                <!-- Welcome Screen -->
-                <div class="welcome-screen" id="welcome-screen">
-                    <div class="welcome-icon">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <!-- Chat Interface Panel -->
+            <div id="chat-panel" style="display: flex; flex-direction: column; flex-grow: 1; height: calc(100% - 70px);">
+                <!-- Chat Messages Container -->
+                <div class="messages-container" id="messages-container">
+                    <!-- Welcome Screen -->
+                    <div class="welcome-screen" id="welcome-screen">
+                        <div class="welcome-icon">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <h1>How can Britsync help your business today?</h1>
+                        <p class="welcome-subtitle">Ask me to find clients for your products or scrape targeted TikTok & YouTube influencers.</p>
+                        
+                        <div class="suggestion-cards">
+                            <div class="suggestion-card" onclick="useSuggestion('Find clients for our product: [describe your product here]')">
+                                <i class="fa-solid fa-briefcase text-blue"></i>
+                                <h3>Find Clients</h3>
+                                <p>"Find clients for our product: [describe your product here]"</p>
+                            </div>
+                            <div class="suggestion-card" onclick="useSuggestion('Find [niche] YouTubers with 10k to 100k subscribers to promote [your product name]')">
+                                <i class="fa-brands fa-youtube text-red"></i>
+                                <h3>YouTube Affiliates</h3>
+                                <p>"Find [niche] YouTubers with 10k to 100k subscribers to promote [your product name]"</p>
+                            </div>
+                            <div class="suggestion-card" onclick="useSuggestion('Find [niche] TikTokers with 20k to 80k followers in the UK to promote [your product name]')">
+                                <i class="fa-brands fa-tiktok text-purple"></i>
+                                <h3>TikTok Affiliates</h3>
+                                <p>"Find [niche] TikTokers with 20k to 80k followers in the UK to promote [your product name]"</p>
+                            </div>
+                        </div>
                     </div>
-                    <h1>How can Britsync help your business today?</h1>
-                    <p class="welcome-subtitle">Ask me to find clients for your products or scrape targeted TikTok & YouTube influencers.</p>
+                </div>
+
+                <!-- Input Container -->
+                <footer class="input-container">
+                    <form id="chat-form" class="input-form">
+                        <div class="input-wrapper">
+                            <input type="text" id="user-input" placeholder="Type a product or influencer niche to search..." autocomplete="off" required>
+                            <div class="input-actions">
+                                <button type="submit" class="send-btn" id="send-btn" aria-label="Send Message">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="input-footer-text">
+                        Britsync AI Outreach Copilot uses live Tavily web scraping and Qdrant vector memory to find high-value targets.
+                    </div>
+                </footer>
+            </div>
+
+            <!-- Bulk Outreach Dashboard Panel -->
+            <div id="bulk-panel" style="display: none; flex-direction: column; flex-grow: 1; height: calc(100% - 70px); padding: 24px; overflow-y: auto;">
+                <div style="margin-bottom: 20px;">
+                    <h2 style="font-size: 20px; font-weight: 600; color: white;"><i class="fa-solid fa-bolt text-purple" style="margin-right: 8px;"></i> Bulk Campaign Manager</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Launch automated marketing campaigns targeting your collected leads using your serverless Modal GPU 70B model.</p>
+                </div>
+
+                <!-- Campaign Config Card -->
+                <div class="lead-card" style="margin-bottom: 20px; padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                    <h3 style="color: white; font-size: 15px; font-weight: 600;">1. Campaign Parameters</h3>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 12px; color: var(--text-secondary);">Outreach Pitch / Product Offer Description:</label>
+                            <input type="text" id="bulk-product" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: white; font-size: 13px;" value="Our custom video generation model that creates high-converting marketing ads.">
+                        </div>
+                        <div style="width: 140px; display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 12px; color: var(--text-secondary);">Batch Size (Emails):</label>
+                            <input type="number" id="bulk-limit" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: white; font-size: 13px;" value="5" min="1">
+                        </div>
+                    </div>
+                    <button class="action-btn" id="run-bulk-btn" style="background: var(--gradient-primary); color: black; font-weight: bold; padding: 10px 20px; border-radius: 20px; cursor: pointer; align-self: flex-start; display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                        <i class="fa-solid fa-rocket"></i> Start Automated Campaign
+                    </button>
                     
-                    <div class="suggestion-cards">
-                        <div class="suggestion-card" onclick="useSuggestion('Find clients for our product: [describe your product here]')">
-                            <i class="fa-solid fa-briefcase text-blue"></i>
-                            <h3>Find Clients</h3>
-                            <p>"Find clients for our product: [describe your product here]"</p>
+                    <!-- Campaign Progress Bar -->
+                    <div id="bulk-progress-container" style="display: none; flex-direction: column; gap: 8px; margin-top: 10px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-primary);">
+                            <span id="bulk-progress-status">Preparing campaign queue...</span>
+                            <span id="bulk-progress-percent">0%</span>
                         </div>
-                        <div class="suggestion-card" onclick="useSuggestion('Find [niche] YouTubers with 10k to 100k subscribers to promote [your product name]')">
-                            <i class="fa-brands fa-youtube text-red"></i>
-                            <h3>YouTube Affiliates</h3>
-                            <p>"Find [niche] YouTubers with 10k to 100k subscribers to promote [your product name]"</p>
+                        <div style="width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden;">
+                            <div id="bulk-progress-bar" style="width: 0%; height: 100%; background: var(--accent-purple); transition: width 0.3s ease;"></div>
                         </div>
-                        <div class="suggestion-card" onclick="useSuggestion('Find [niche] TikTokers with 20k to 80k followers in the UK to promote [your product name]')">
-                            <i class="fa-brands fa-tiktok text-purple"></i>
-                            <h3>TikTok Affiliates</h3>
-                            <p>"Find [niche] TikTokers with 20k to 80k followers in the UK to promote [your product name]"</p>
-                        </div>
+                    </div>
+                </div>
+
+                <!-- Directory Leads Table -->
+                <div class="lead-card" style="padding: 20px;">
+                    <h3 style="color: white; font-size: 15px; font-weight: 600; margin-bottom: 15px;">2. Scraped Lead Directory</h3>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                                    <th style="padding: 10px 8px; width: 40px;"><input type="checkbox" id="select-all-bulk" checked></th>
+                                    <th style="padding: 10px 8px;">Lead Name</th>
+                                    <th style="padding: 10px 8px;">Platform / Company</th>
+                                    <th style="padding: 10px 8px;">Contact Email</th>
+                                    <th style="padding: 10px 8px;">Category Type</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bulk-leads-tbody">
+                                <!-- Aggregated leads will load here dynamically -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-
-            <!-- Input Container (Gemini-style) -->
-            <footer class="input-container">
-                <form id="chat-form" class="input-form">
-                    <div class="input-wrapper">
-                        <input type="text" id="user-input" placeholder="Type a product or influencer niche to search..." autocomplete="off" required>
-                        <div class="input-actions">
-                            <button type="submit" class="send-btn" id="send-btn" aria-label="Send Message">
-                                <i class="fa-solid fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-                <div class="input-footer-text">
-                    Britsync AI Outreach Copilot uses live Tavily web scraping and Qdrant vector memory to find high-value targets.
-                </div>
-            </footer>
         </main>
     </div>
 
